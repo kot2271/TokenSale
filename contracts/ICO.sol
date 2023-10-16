@@ -28,7 +28,7 @@ contract ICO is AccessControl {
     event Claimed(address indexed addr, uint256 amount);
 
     constructor(address _testToken, address _usdToken) {
-        _setupRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _setupRole(ADMIN_ROLE, msg.sender);
         testToken = IERC20(_testToken);
         usdToken = IERC20(_usdToken);
 
@@ -47,35 +47,43 @@ contract ICO is AccessControl {
 
         uint256 usdAmount = (amount * price) / (10**12);
 
-        require(usdToken.approve(address(this), usdAmount), "Approval to transfer USD failed");
-
+        // Transfer USD to ico contract
         require(usdToken.transferFrom(msg.sender, address(this), usdAmount), "USD transfer failed");
-        require(testToken.transfer(msg.sender, amount), "TST transfer failed");
 
+        // Sending the purchased TST's to ico contract
+        require(testToken.transferFrom(msg.sender, address(this), amount), "TST transfer failed");
+
+        // Saving the purchase data
         purchasedAmounts[msg.sender] += amount;
         emit BuyToken(msg.sender, amount, usdAmount);
     }
 
     function withdrawTokens() external {
-        uint256 claimableAmount = getAvailableAmount(msg.sender);
-        require(claimableAmount > 0, "No 'TST' tokens to withdraw");
+        uint256 available = getAvailableAmount(msg.sender);
+        require(available > 0, "No 'TST' tokens to withdraw");
 
-        require(testToken.transfer(msg.sender, claimableAmount), "TST transfer failed");
-        claimedAmounts[msg.sender] += claimableAmount;
-        emit Withdrawn(msg.sender, claimableAmount);
+        require(testToken.transfer(msg.sender, available), "TST transfer failed");
+        claimedAmounts[msg.sender] += available;
+        emit Withdrawn(msg.sender, available);
     }
 
     function getAvailableAmount(address user) public view returns (uint256) {
-        if (block.timestamp >= claim1Timestamp && block.timestamp < claim2Timestamp) {
-            return (purchasedAmounts[user] * 10) / 100;
-        } else if (block.timestamp >= claim2Timestamp && block.timestamp < claim3Timestamp) {
-            return (purchasedAmounts[user] * 30) / 100;
-        } else if (block.timestamp >= claim3Timestamp && block.timestamp < claim4Timestamp) {
-            return (purchasedAmounts[user] * 50) / 100;
-        } else if (block.timestamp >= claim4Timestamp) {
-            return purchasedAmounts[user] - claimedAmounts[user];
+        // Available =  'all purchased' - 'already claimed'
+        uint256 remaining = purchasedAmounts[user] - claimedAmounts[user];
+
+        // Checking periods
+        if (block.timestamp < claim1Timestamp) {
+            return 0;
+        } else if (block.timestamp < claim2Timestamp) { 
+            return remaining * 10 / 100;
+        } else if (block.timestamp < claim3Timestamp) {
+            return remaining * 30 / 100;
+        } else if (block.timestamp < claim4Timestamp) {
+            return remaining * 50 / 100;
+        } 
+        else {
+          return remaining;
         }
-        return 0;
     }
 
     function withdrawUSD() onlyRole(ADMIN_ROLE) external {

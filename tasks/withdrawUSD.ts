@@ -15,7 +15,7 @@ task("withdrawUSD", "Withdraw USD tokens (admin)")
     const event = contractReceipt.events?.find(event => event.event === 'Claimed');
     const user: Address = event?.args!['addr'];
     const Amount: BigNumber = event?.args!['amount'];
-    const etherAmount = ethers.utils.formatEther(Amount);
+    const etherAmount = ethers.utils.formatUnits(Amount, 6);
 
     console.log(`User ${user} withdrawn ${etherAmount} 'USD' tokens`);
   });

@@ -46,7 +46,7 @@ Create a new task(s) and save it(them) in the folder "tasks". Add a new task_nam
 
 Running a approve task:
 ```shell
-npx hardhat approve --usd-token {USD_TOKEN_ADDRESS} --ico-contract {ICO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
+npx hardhat approve --usd-token {USD_TOKEN_ADDRESS} --tst-token {TEST_TOKEN_ADDRESS} --ico-contract {ICO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
 ```
 
 Running a buyToken task:
@@ -59,13 +59,31 @@ Running a testTokenBalance task:
 npx hardhat testTokenBalance --token {TEST_TOKEN_ADDRESS} --user {OWNER_ADDRESS} --network polygon-mumbai
 ```
 
+Running a usdTokenBalance task:
+```shell
+npx hardhat usdTokenBalance --token {USD_TOKEN_ADDRESS} --user {OWNER_ADDRESS} --network polygon-mumbai
+```
+
 Running a withdrawTokens task:
 ```shell
 npx hardhat withdrawTokens --ico {ICO_CONTRACT_ADDRESS} --network polygon-mumbai
 ```
 
-Running a withdrawTokens task:
+Running a withdrawUSD task:
 ```shell
 npx hardhat withdrawUSD --ico {ICO_CONTRACT_ADDRESS} --network polygon-mumbai
 ```
 
+## Verify
+
+Verify the installation by running the following command:
+```shell
+npx hardhat verify --network polygon-mumbai {TEST_TOKEN_ADDRESS} "TestToken" "TST"
+```
+
+```shell
+npx hardhat verify --network polygon-mumbai {USD_TOKEN_ADDRESS} "USDToken" "USD"
+```
+
+```shell
+npx hardhat verify --network polygon-mumbai {ICO_CONTRACT_ADDRESS} {TEST_TOKEN_ADDRESS} {USD_TOKEN_ADDRESS}

@@ -20,7 +20,7 @@ task("buyToken", "Buy tokens during ICO")
     const tstAmount: BigNumber = event?.args!['tstAmount'];
     const usdAmount: BigNumber = event?.args!['usdAmount'];
     const etherTstAmount = ethers.utils.formatEther(tstAmount);
-    const etherUsdAmount = ethers.utils.formatEther(usdAmount);
+    const etherUsdAmount = ethers.utils.formatUnits(usdAmount, 6);
 
     console.log(`User ${user} bought ${etherTstAmount} 'TST' tokens for ${etherUsdAmount} 'USD'`);
   });
