@@ -24,6 +24,8 @@ ICO смарт контракт:
 - После начала неделения(когда можно claim) покупки токенов прекращаются
 - Минимальная покупка 10 TST и максимальная 100 TST
 
+![schema](https://github.com/kot2271/TokenSale/blob/main/schema/schema.jpeg)
+
 ## Installation
 Clone the repository using the following command:
 Install the dependencies using the following command:
