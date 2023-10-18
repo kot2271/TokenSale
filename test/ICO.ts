@@ -27,6 +27,9 @@ describe("ICO contract", function () {
         const icoFactory = (await ethers.getContractFactory("ICO", owner)) as ICO__factory;
         icoContract = await icoFactory.deploy(testToken.address, usdToken.address);
 
+        const amount = await testToken.totalSupply();
+        await testToken.transfer(icoContract.address, amount);
+
         async function getNodeTime(): Promise<number> {
             let blockNumber = await ethers.provider.send('eth_blocknumber', []);
             let txBlockNumber = await ethers.provider.send('eth_getBlockByNumber', [blockNumber, false]);
@@ -60,8 +63,9 @@ describe("ICO contract", function () {
             });
           
             it("should have the correct initial balance for the owner", async () => {
-                  expect(await testToken.balanceOf(owner.address)).to.equal(INITIAL_TEST_TOKENS_AMOUNT);
+                  expect(await testToken.balanceOf(owner.address)).to.equal(0);
                   expect(await usdToken.balanceOf(owner.address)).to.equal(INITIAL_USD_TOKENS_AMOUNT);
+                  expect(await icoContract.balanceOf(owner.address)).to.equal(INITIAL_TEST_TOKENS_AMOUNT);
             });
         });
 
@@ -73,7 +77,6 @@ describe("ICO contract", function () {
 
                 // Permission must be granted before purchase.
                 await usdToken.approve(icoContract.address, usdAmount, { from: user1.address });
-                await testToken.approve(icoContract.address, amountToBuy, { from: user1.address });
 
                 // startTime + 20 days
                 const currentTime = await getNodeTime();
@@ -125,7 +128,6 @@ describe("ICO contract", function () {
                 await shiftTime(currentTime + (20 * 86400))
 
                 await usdToken.approve(icoContract.address, usdAmount, { from: user2.address });
-                await testToken.approve(icoContract.address, amountToBuy, { from: user2.address });
                 await icoContract.buyToken(amountToBuy, { from: user2.address });
 
                 // startTime + 70 days
@@ -167,7 +169,6 @@ describe("ICO contract", function () {
                 await shiftTime(currentTime + (20 * 86400))
 
                 await usdToken.approve(icoContract.address, usdAmount, { from: user2.address });
-                await testToken.approve(icoContract.address, amountToBuy, { from: user2.address });
                 await icoContract.buyToken(amountToBuy, { from: user2.address });
 
                 // startTime + 120 days

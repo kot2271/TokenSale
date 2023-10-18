@@ -3,8 +3,10 @@ pragma solidity ^0.8.19;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/utils/math/SafeMath.sol";
 
 contract ICO is AccessControl {
+    using SafeMath for uint256;
     bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
 
     IERC20 public testToken;
@@ -45,13 +47,10 @@ contract ICO is AccessControl {
         require(amount >= minPurchase, "Amount is less than the minimum purchase");
         require(amount <= maxPurchase, "Amount is more than the maximum purchase");
 
-        uint256 usdAmount = (amount * price) / (10**12);
+        uint256 usdAmount = (amount.mul(price)).div(10**12);
 
         // Transfer USD to ico contract
         require(usdToken.transferFrom(msg.sender, address(this), usdAmount), "USD transfer failed");
-
-        // Sending the purchased TST's to ico contract
-        require(testToken.transferFrom(msg.sender, address(this), amount), "TST transfer failed");
 
         // Saving the purchase data
         purchasedAmounts[msg.sender] += amount;
@@ -68,21 +67,21 @@ contract ICO is AccessControl {
     }
 
     function getAvailableAmount(address user) public view returns (uint256) {
-        // Available =  'all purchased' - 'already claimed'
-        uint256 remaining = purchasedAmounts[user] - claimedAmounts[user];
-
+        uint256 purchased = purchasedAmounts[user];
+        uint256 claimed = claimedAmounts[user];
+        
         // Checking periods
-        if (block.timestamp < claim1Timestamp) {
+       if (block.timestamp < claim1Timestamp) {
             return 0;
         } else if (block.timestamp < claim2Timestamp) { 
-            return remaining * 10 / 100;
+            return (purchased.mul(10).div(100)).sub(claimed);
         } else if (block.timestamp < claim3Timestamp) {
-            return remaining * 30 / 100;
+            return (purchased.mul(30).div(100)).sub(claimed);
         } else if (block.timestamp < claim4Timestamp) {
-            return remaining * 50 / 100;
+            return (purchased.mul(50).div(100)).sub(claimed);
         } 
         else {
-          return remaining;
+          return purchased.sub(claimed);
         }
     }
 

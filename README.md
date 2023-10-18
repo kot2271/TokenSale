@@ -46,14 +46,24 @@ npx hardhat run scripts/deploy.ts --network polygon-mumbai
 
 Create a new task(s) and save it(them) in the folder "tasks". Add a new task_name in the file "tasks/index.ts"
 
+Running a transferTestTokens task:
+```shell
+npx hardhat transferTestTokens --token {TEST_TOKEN_ADDRESS} --ico {ICO_CONTRACT_ADDRESS} --network polygon-mumbai
+```
+
 Running a approve task:
 ```shell
-npx hardhat approve --usd-token {USD_TOKEN_ADDRESS} --tst-token {TEST_TOKEN_ADDRESS} --ico-contract {ICO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
+npx hardhat approve --usd-token {USD_TOKEN_ADDRESS} --ico-contract {ICO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
 ```
 
 Running a buyToken task:
 ```shell
 npx hardhat buyToken --ico {ICO_CONTRACT_ADDRESS} --amount 20 --network polygon-mumbai
+```
+
+Running a getAvailableAmount task:
+```shell
+npx hardhat getAvailableAmount --ico {ICO_CONTRACT_ADDRESS} --user {USER_ADDRESS} --network polygon-mumbai
 ```
 
 Running a testTokenBalance task:
