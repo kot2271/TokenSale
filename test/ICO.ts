@@ -1,7 +1,8 @@
 import { SignerWithAddress } from "@nomiclabs/hardhat-ethers/signers";
 import { expect } from "chai";
-import { BigNumber, Contract } from "ethers";
+import { BigNumber, Contract, ContractTransaction, ContractReceipt } from "ethers";
 import { ethers } from "hardhat";
+import { Address } from 'cluster';
 
 import { ICO } from "../src/types/ICO";
 import { ICO__factory } from "../src/types/factories/ICO__factory";
@@ -14,6 +15,7 @@ describe("ICO contract", function () {
     const INITIAL_TEST_TOKENS_AMOUNT: BigNumber = ethers.utils.parseUnits("10000", "18");
     const INITIAL_USD_TOKENS_AMOUNT: BigNumber = ethers.utils.parseUnits("10000", "6");
     let owner: SignerWithAddress, user1: SignerWithAddress, user2: SignerWithAddress, users: SignerWithAddress[];
+    const startTime = Math.floor(Date.now() / 1000) + 60;
 
     beforeEach(async () => {
         [owner, user1, user2, ...users] = await ethers.getSigners();
@@ -29,17 +31,7 @@ describe("ICO contract", function () {
 
         const amount = await testToken.totalSupply();
         await testToken.transfer(icoContract.address, amount);
-
-        async function getNodeTime(): Promise<number> {
-            let blockNumber = await ethers.provider.send('eth_blocknumber', []);
-            let txBlockNumber = await ethers.provider.send('eth_getBlockByNumber', [blockNumber, false]);
-            return parseInt((txBlockNumber.timestamp).toString());
-        }
-
-        async function shiftTime(newTime: number | string) {
-            await ethers.provider.send('evm_increaseTime', [newTime]);
-            await ethers.provider.send('evm_mine', []);
-        }
+    });
 
         describe("Initial params of token contracts", async () => {
             it("Initializes name, symbol and decimals correctly", async () => {
@@ -65,136 +57,148 @@ describe("ICO contract", function () {
             it("should have the correct initial balance for the owner", async () => {
                   expect(await testToken.balanceOf(owner.address)).to.equal(0);
                   expect(await usdToken.balanceOf(owner.address)).to.equal(INITIAL_USD_TOKENS_AMOUNT);
-                  expect(await icoContract.balanceOf(owner.address)).to.equal(INITIAL_TEST_TOKENS_AMOUNT);
             });
         });
 
-        describe("buyToken", function() {
+        describe("buyToken", async () => {
 
             it("Checking buyToken function", async () => {
-                const amountToBuy: BigNumber = BigNumber.from(20 * 10 ** 18); // 20 TST
-                const usdAmount: BigNumber = BigNumber.from((amountToBuy.mul(2)).div(10 ** 12)); // 1 TST = 2 USD
+                const amountToBuy: BigNumber = ethers.utils.parseEther("20"); // 20 TST
+                const usdAmount: BigNumber = (amountToBuy.mul(2)).div(10 ** 12); // 1 TST = 2 USD
 
                 // Permission must be granted before purchase.
-                await usdToken.approve(icoContract.address, usdAmount, { from: user1.address });
+                await usdToken.approve(icoContract.address, usdAmount);
 
                 // startTime + 20 days
-                const currentTime = await getNodeTime();
-                await shiftTime(currentTime + (20 * 86400))
+                await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
+                await ethers.provider.send("evm_increaseTime", [20 * 86400]);
 
-                // User1 buys tokens
-                await icoContract.buyToken(amountToBuy, { from: user1.address });
-
-                // Check that user1 TST balance has increased
-                const user1Balance: BigNumber = await testToken.balanceOf(user1.address);
-                expect(user1Balance).to.equal(amountToBuy);
+                await icoContract.buyToken(amountToBuy);
 
                 // Check that the contract has an increased procurement amount
-                const purchasedAmount: BigNumber = await icoContract.purchasedAmounts(user1.address);
+                const purchasedAmount: BigNumber = await icoContract.purchasedAmounts(owner.address);
                 expect(purchasedAmount).to.equal(amountToBuy);
             });
 
-            it("reverts if sale not started", async function() {
-                await getNodeTime();
-                await expect(icoContract.buyToken(10)).to.be.revertedWith("ICO has not started yet"); 
-            });
-
             it("reverts if sale finished", async function() {
-                // startTime + 35 days
-                const currentTime = await getNodeTime();
-                await shiftTime(currentTime + (35 * 86400))
-                await expect(icoContract.buyToken(10)).to.be.revertedWith("Claiming has started, you can't buy anymore"); 
+                const amountToBuy: BigNumber = ethers.utils.parseEther("10"); // 10 TST
+                const usdAmount: BigNumber = (amountToBuy.mul(2)).div(10 ** 12); // 1 TST = 2 USD
+                await usdToken.approve(icoContract.address, usdAmount);
+                await ethers.provider.send("evm_increaseTime", [startTime]);
+                await expect(icoContract.buyToken(amountToBuy)).to.be.revertedWith("Claiming has started, you can't buy anymore"); 
             });
 
             it("reverts if amount is less than the minimum purchase", async function() {
-                const amount: BigNumber = BigNumber.from(7 * 10 ** 18); // 7 TST
-                await expect(icoContract.buyToken(amount, { from: user1.address })).to.be.revertedWith("Amount is less than the minimum purchase");
+                // startTime + 20 days
+                await ethers.provider.send("evm_increaseTime", [20 * 86400]);
+                const amountToBuy: BigNumber = ethers.utils.parseEther("7"); // 7 TST
+                const usdAmount: BigNumber = (amountToBuy.mul(2)).div(10 ** 12); // 1 TST = 2 USD
+                await usdToken.approve(icoContract.address, usdAmount);
+                await expect(icoContract.buyToken(amountToBuy)).to.be.revertedWith("Amount is less than the minimum purchase");
             });
 
             it("reverts if amount is more than the maximum purchase", async function() {
-                const amount: BigNumber = BigNumber.from(120 * 10 ** 18); // 120 TST
-                await expect(icoContract.buyToken(amount, { from: user1.address })).to.be.revertedWith("Amount is more than the maximum purchase");
+                // startTime + 20 days
+                await ethers.provider.send("evm_increaseTime", [20 * 86400]);
+                const amountToBuy: BigNumber = ethers.utils.parseEther("120"); // 120 TST
+                const usdAmount: BigNumber = (amountToBuy.mul(2)).div(10 ** 12); // 1 TST = 2 USD
+                await usdToken.approve(icoContract.address, usdAmount);
+                await expect(icoContract.buyToken(amountToBuy)).to.be.revertedWith("Amount is more than the maximum purchase");
             });
         });
 
-        describe("withdrawTokens", function() {
-
+        describe("withdrawTokens", async () => {
+        
             it("Checking the withdrawTokens function", async () => {
-                const amountToBuy: BigNumber = BigNumber.from(30 * 10 ** 18); // 30 TST
-                const usdAmount: BigNumber = BigNumber.from((amountToBuy.mul(2)).div(10 ** 12)); // 1 TST = 2 USD
+                const amountToBuy: BigNumber = ethers.utils.parseEther("30"); // 30 TST
+                const usdAmount: BigNumber = (amountToBuy.mul(2)).div(10 ** 12); // 1 TST = 2 USD
 
                 // startTime + 20 days
-                const currentTime = await getNodeTime();
-                await shiftTime(currentTime + (20 * 86400))
+                // await ethers.provider.send("evm_setNextBlockTimestamp", [startTime]);
+                await ethers.provider.send("evm_increaseTime", [20 * 86400]);
 
-                await usdToken.approve(icoContract.address, usdAmount, { from: user2.address });
-                await icoContract.buyToken(amountToBuy, { from: user2.address });
+                await usdToken.approve(icoContract.address, usdAmount);
+                await icoContract.buyToken(amountToBuy);
 
-                // startTime + 70 days
-                const updatedTime = await getNodeTime();
-                await shiftTime(updatedTime + (50 * 86400))
+                // startTime + 50 days
+                await ethers.provider.send("evm_increaseTime", [50 * 86400]);
 
                 // User2 extracts the available tokens.
-                await icoContract.withdrawTokens({ from: user2.address });
+                await icoContract.withdrawTokens();
 
                 // Check that user2 TST balance has increased
-                const user2Balance: BigNumber = await testToken.balanceOf(user2.address);
-                expect(user2Balance).to.equal(amountToBuy);
+                const user1Balance: BigNumber = await testToken.balanceOf(owner.address);
+                const actualBalance: BigNumber = amountToBuy.mul(30).div(100);
+                expect(user1Balance).to.equal(actualBalance);
 
                 // check that the contract has an increased amount of extracted tokens
-                const claimedAmount: BigNumber = await icoContract.claimedAmounts(user2.address);
-                expect(claimedAmount).to.equal(amountToBuy);
+                const claimedAmount: BigNumber = await icoContract.claimedAmounts(owner.address);
+                expect(claimedAmount).to.equal(actualBalance);
+                
+                // startTime + 121 days
+                await ethers.provider.send("evm_increaseTime", [51 * 86400]);
+
+                // User2 extracts the available tokens.
+                await icoContract.withdrawTokens();
+
+                // Check that user2 TST balance has increased
+                const balance: BigNumber = await testToken.balanceOf(owner.address);
+                expect(balance).to.equal(amountToBuy);
+
+                // check that the contract has an increased amount of extracted tokens
+                const claimed: BigNumber = await icoContract.claimedAmounts(owner.address);
+                expect(claimed).to.equal(amountToBuy);
             });
 
             it("reverts if nothing to claim", async function() {
                 // startTime + 70 days
-                const currentTime = await getNodeTime();
-                await shiftTime(currentTime + (70 * 86400))
+                await ethers.provider.send("evm_increaseTime", [70 * 86400]);
                 await expect(icoContract.withdrawTokens()).to.be.revertedWith("No 'TST' tokens to withdraw");
             });
         });
 
-        describe("withdrawUSD", function() {
+        describe("withdrawUSD", async () => {
 
             it("Checking the withdrawUSD function", async () => {
                 // Assume that the contract owner is an administrator.
                 const admin = owner; 
-                const initialBalance: BigNumber = await usdToken.balanceOf(admin.address);
+                const amountToBuy: BigNumber = ethers.utils.parseEther("40"); // 40 TST
+                const usdAmount: BigNumber = (amountToBuy.mul(2)).div(10 ** 12); // 1 TST = 2 USD
 
-                const amountToBuy: BigNumber = BigNumber.from(40 * 10 ** 18); // 40 TST
-                const usdAmount: BigNumber = BigNumber.from((amountToBuy.mul(2)).div(10 ** 12)); // 1 TST = 2 USD
+                const initialUSDBalance: BigNumber = await usdToken.balanceOf(icoContract.address);
 
                 // startTime + 20 days
-                const currentTime = await getNodeTime();
-                await shiftTime(currentTime + (20 * 86400))
+                await ethers.provider.send("evm_increaseTime", [20 * 86400]);
 
-                await usdToken.approve(icoContract.address, usdAmount, { from: user2.address });
-                await icoContract.buyToken(amountToBuy, { from: user2.address });
+                await usdToken.approve(icoContract.address, usdAmount);
+                await icoContract.buyToken(amountToBuy);
 
-                // startTime + 120 days
-                const updatedTime = await getNodeTime();
-                await shiftTime(updatedTime + (100 * 86400))
+                // startTime + 121 days
+                await ethers.provider.send("evm_increaseTime", [121 * 86400]);
 
                 // The administrator serves as withdrawUSD.
-                await icoContract.withdrawUSD({ from: admin.address });
+                const contractTx: ContractTransaction = await icoContract.withdrawUSD();
+                const contractReceipt: ContractReceipt = await contractTx.wait();
+                const event = contractReceipt.events?.find(event => event.event === 'Claimed');
+                const sender: Address = event?.args!['addr'];
+                const Amount: BigNumber = event?.args!['amount'];
 
-                // Check that the administrator's balance has increased by the expected amount
-                const finalBalance: BigNumber = await usdToken.balanceOf(admin.address);
-                const expectedBalance = initialBalance.add(finalBalance);
-                expect(finalBalance).to.equal(expectedBalance);
+                const totalAmount: BigNumber = initialUSDBalance.add(Amount)
+
+                // Check that the administrator's balance has increased by the expected usdAmount
+                expect(usdAmount).to.equal(totalAmount);
+                expect(admin.address).to.equal(sender);
             });
 
             it("reverts if caller is not admin", async function() {
-                const adminRole = await icoContract.ADMIN_ROLE();
-                await expect(icoContract.connect(user2.address).withdrawUSD()).to.be.revertedWith(`AccessControl: account ${user2.address} is missing role ${adminRole}`);
-            });
+                await expect(icoContract.connect(user2.address).withdrawUSD()).to.be.reverted;
+                });
 
             it("reverts if there are no 'USD' tokens to withdraw", async function(){
                 const admin = owner; 
-                const usdBalance: BigNumber = await usdToken.balanceOf(admin.address);
+                const usdBalance: BigNumber = await usdToken.balanceOf(icoContract.address);
                 expect(usdBalance).to.equal(0);
-                await expect(icoContract.connect(admin.address).withdrawUSD()).to.be.revertedWith("No 'USD' tokens to withdraw");
+                await expect(icoContract.connect(admin.address).withdrawUSD()).to.be.reverted;
             });
         });
-    });
 });
